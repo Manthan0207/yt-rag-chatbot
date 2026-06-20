@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic
+pydantic-settings
+python-dotenv
+python-jose[cryptography]
+passlib[bcrypt]
+email-validator
+langchain
+langchain-openai
+langchain-core
+langgraph
+youtube-transcript-api
+pinecone

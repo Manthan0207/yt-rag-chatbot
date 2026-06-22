@@ -5,7 +5,7 @@ from app.database import Base
 import uuid
 
 
-def uuid_str() -> set : 
+def uuid_str() -> str:
     return str(uuid.uuid4())
 
 

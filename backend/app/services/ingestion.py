@@ -1,27 +1,47 @@
 import re
+from urllib.parse import parse_qs, urlparse
 from youtube_transcript_api import YouTubeTranscriptApi
 from sqlalchemy.orm import Session
-from langchain_openai import OpenAIEmbeddings
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from langchain_core.documents import Document
 from app.core.config import settings
 from app.database import SessionLocal
 from app.models import Video
 from app.services.pinecone_service import get_index
 
-embedding_model = OpenAIEmbeddings(model="text-embedding-3-small")
+embedding_model = HuggingFaceEndpointEmbeddings(
+    model="BAAI/bge-large-en-v1.5",
+    huggingfacehub_api_token=settings.hf_token,
+)
 
 
 def extract_video_id(youtube_url: str) -> str:
-    patterns = [
-        r"v=([a-zA-Z0-9_-]{11})",
-        r"youtu\.be/([a-zA-Z0-9_-]{11})",
-        r"shorts/([a-zA-Z0-9_-]{11})",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, youtube_url)
-        if match:
-            return match.group(1)
-    raise ValueError("Could not extract video id from URL")
+    normalized_url = youtube_url.strip()
+    parsed_url = urlparse(normalized_url if "://" in normalized_url else f"https://{normalized_url}")
+
+    if parsed_url.hostname in {"www.youtube.com", "youtube.com", "m.youtube.com"}:
+        query_video_id = parse_qs(parsed_url.query).get("v", [None])[0]
+        if query_video_id:
+            return query_video_id
+
+        path_match = re.search(r"/shorts/([a-zA-Z0-9_-]{11})", parsed_url.path)
+        if path_match:
+            return path_match.group(1)
+
+        embed_match = re.search(r"/embed/([a-zA-Z0-9_-]{11})", parsed_url.path)
+        if embed_match:
+            return embed_match.group(1)
+
+    if parsed_url.hostname == "youtu.be":
+        path_match = re.search(r"^/([a-zA-Z0-9_-]{11})", parsed_url.path)
+        if path_match:
+            return path_match.group(1)
+
+    raw_match = re.search(r"([a-zA-Z0-9_-]{11})", normalized_url)
+    if raw_match:
+        return raw_match.group(1)
+
+    raise ValueError(f"Could not extract video id from URL: {youtube_url}")
 
 
 def chunk_transcript(snippets, max_chunk_duration: int = 45):
@@ -62,7 +82,7 @@ def ingest_video_for_url(youtube_url: str):
             return
 
         try:
-            transcript = YouTubeTranscriptApi().fetch(video_id).snippets
+            transcript = YouTubeTranscriptApi().fetch(video_id, languages=["en", "hi"]).snippets
             chunks = chunk_transcript(transcript, 45)
 
             docs = [

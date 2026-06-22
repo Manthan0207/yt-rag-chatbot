@@ -5,11 +5,12 @@ pydantic
 pydantic-settings
 python-dotenv
 python-jose[cryptography]
-passlib[bcrypt]
+bcrypt
 email-validator
 langchain
-langchain-openai
 langchain-core
 langgraph
 youtube-transcript-api
 pinecone
+langgraph-checkpoint-sqlite
+langchain-huggingface

@@ -27,6 +27,8 @@ def create_thread(
         db.refresh(video)
         background_tasks.add_task(ingest_video_for_url, payload.youtube_url)
     elif video.status != "ready":
+        video.status = "processing"
+        db.commit()
         background_tasks.add_task(ingest_video_for_url, payload.youtube_url)
 
     thread = Thread(user_id=current_user.id, video_id=video_id)
@@ -105,13 +107,8 @@ def send_message(
     user_message = Message(thread_id=thread.id, role="user", content=payload.content)
     db.add(user_message)
     db.commit()
-    db.refresh(user_message)
 
-    assistant_content = run_chat_turn(
-        db=db,
-        thread=thread,
-        user_message_content=payload.content,
-    )
+    assistant_content = run_chat_turn(db=db, thread=thread, user_message_content=payload.content)
 
     assistant_message = Message(thread_id=thread.id, role="assistant", content=assistant_content)
     db.add(assistant_message)
